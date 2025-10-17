@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventChain Tickets DApp</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Ethers.js for blockchain interaction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <style>
+        /* Custom scrollbar for dark mode */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .tab-content { max-height: 80vh; overflow-y: auto; }
+        .inter-font { font-family: 'Inter', sans-serif; }
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            border-radius: 0.5rem 0.5rem 0 0;
+            background-color: #374151;
+            color: #d1d5db;
+            margin-right: 0.25rem;
+            font-weight: 500;
+        }
+        .tab-button:hover {
+            background-color: #4b5563;
+        }
+        .active-tab {
+            background-color: #1f2937;
+            color: #ffffff;
+            border-bottom: 3px solid #10b981;
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #4b5563;
+            background-color: #1f2937;
+            color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen inter-font p-4">
+
+    <div id="app" class="max-w-4xl mx-auto">
+        <!-- Header and Status -->
+        <header class="mb-8 p-4 bg-gray-800 rounded-xl shadow-lg">
+            <h1 class="text-3xl font-bold text-teal-400 mb-2">EventChain Tickets</h1>
+            <p class="text-sm text-gray-400">Secure, decentralized event ticketing ledger.</p>
+            <div id="wallet-status" class="mt-3 text-sm flex items-center justify-between">
+                <span id="wallet-id-display" class="font-mono bg-gray-700 p-2 rounded-lg text-xs break-all">Wallet ID: Not Connected</span>
+                <button id="connect-button" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
+                    Connect Wallet
+                </button>
+            </div>
+            <div id="message-area" class="mt-4 hidden p-3 rounded-lg text-sm text-center font-medium"></div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-gray-700 mb-6">
+            <button onclick="switchTab('host')" id="tab-host" class="tab-button active-tab">Host Dashboard</button>
+            <button onclick="switchTab('marketplace')" id="tab-marketplace" class="tab-button">Marketplace</button>
+            <button onclick="switchTab('my-tickets')" id="tab-my-tickets" class="tab-button">My Tickets</button>
+        </div>
+
+        <!-- Tab Content -->
+        <div id="host" class="tab-content">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Create New Event</h2>
+            <form id="create-event-form" class="bg-gray-800 p-6 rounded-xl shadow-inner space-y-4">
+                <input type="text" id="event-title" placeholder="Event Title (e.g., Synthwave Night)" required class="form-input">
+                <input type="datetime-local" id="event-date" required class="form-input">
+                <input type="text" id="event-location" placeholder="Location (e.g., Venue XYZ)" required class="form-input">
+                <input type="number" id="event-price" placeholder="Ticket Price (in ETH, e.g., 0.01)" step="any" min="0.0001" required class="form-input">
+                <input type="number" id="event-total-tickets" placeholder="Total Tickets Available" min="1" required class="form-input">
+                <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg transition duration-200">
+                    Create Event on Chain
+                </button>
+            </form>
+
+            <h2 class="text-2xl font-semibold mt-8 mb-4 text-white">My Hosted Events</h2>
+            <div id="my-hosted-events" class="space-y-4">
+                <p class="text-gray-500 text-center p-4">Connect wallet and create an event to see your dashboard.</p>
+            </div>
+        </div>
+
+        <div id="marketplace" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold mb-4 text-white">Active Events Marketplace</h2>
+            <button onclick="loadMarketplaceEvents()" class="mb-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
+                Refresh Events
+            </button>
+            <div id="active-events-list" class="space-y-4">
+                <p class="text-gray-500 text-center p-4">Loading active events...</p>
+            </div>
+        </div>
+
+        <div id="my-tickets" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold mb-4 text-white">My Owned Tickets</h2>
+            <p id="ticket-balance-display" class="text-xl font-bold mb-4 bg-gray-800 p-4 rounded-lg">Owned Tickets (Total NFTs): 0</p>
+            
+            <h3 class="text-xl font-semibold mb-3 text-teal-300">Transfer a Ticket</h3>
+            <div class="bg-gray-800 p-6 rounded-xl shadow-inner space-y-4">
+                <p class="text-gray-400 text-sm">To securely transfer, you must know the specific Ticket ID (Token ID) and the recipient's wallet address.</p>
+                <input type="number" id="transfer-token-id" placeholder="Ticket ID (Token ID)" min="1" required class="form-input">
+                <input type="text" id="transfer-recipient-address" placeholder="Recipient Wallet Address (0x...)" required class="form-input">
+                <button onclick="handleTicketTransfer()" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg transition duration-200">
+                    Transfer Ticket
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // IMPORTANT: Update this after deploying to Ganache
+        const CONTRACT_ADDRESS = "0xf04197b2c9bd17dd6f3ada9cd8314cc1062e2c3e";
+        const DEFAULT_CHAIN_ID = 11155111; // Ganache default chain ID
+
+        // Minimal ABI containing only the functions required by the frontend
+        const CONTRACT_ABI = [
+            "function createEvent(string _title, uint256 _date, uint256 _priceInWei, uint256 _totalTickets)",
+            "function buyTicket(uint256 _eventId) payable",
+            "function transferTicket(address from, address to, uint256 tokenId)",
+            "function getEventDetails(uint256 _eventId) view returns (address host, string title, uint256 date, uint256 price, uint256 total, uint256 sold, bool active)",
+            "function events(uint256) view returns (address host, string title, uint256 date, uint256 priceInWei, uint256 totalTickets, uint256 ticketsSold, bool active)",
+            "function _eventIdCounter() view returns (uint256)",
+            "function balanceOf(address owner) view returns (uint256)",
+            "event EventCreated(uint256 indexed eventId, address indexed host, string title, uint256 totalTickets)",
+            "event TicketPurchased(uint256 indexed eventId, uint256 indexed tokenId, address indexed buyer)",
+        ];
+
+        // --- GLOBAL STATE ---
+        let signer = null;
+        let provider = null;
+        let contract = null;
+        let walletAddress = null;
+
+        // --- UTILITY FUNCTIONS ---
+
+        function showMessage(message, type) {
+            const messageArea = document.getElementById('message-area');
+            messageArea.textContent = message;
+            messageArea.className = 'mt-4 p-3 rounded-lg text-sm text-center font-medium';
+            messageArea.classList.remove('hidden');
+
+            switch (type) {
+                case 'success':
+                    messageArea.classList.add('bg-green-600', 'text-white');
+                    break;
+                case 'error':
+                    messageArea.classList.add('bg-red-600', 'text-white');
+                    break;
+                case 'info':
+                default:
+                    messageArea.classList.add('bg-blue-600', 'text-white');
+                    break;
+            }
+            setTimeout(() => {
+                messageArea.classList.add('hidden');
+            }, 5000);
+        }
+
+        function switchTab(tabId) {
+            ['host', 'marketplace', 'my-tickets'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+                document.getElementById(`tab-${id}`).classList.remove('active-tab');
+            });
+
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).classList.add('active-tab');
+
+            if (tabId === 'marketplace') {
+                loadMarketplaceEvents();
+            } else if (tabId === 'my-tickets') {
+                loadMyTicketBalance();
+            } else if (tabId === 'host') {
+                loadMyHostedEvents();
+            }
+        }
+
+        // --- Ethers.js / BLOCKCHAIN INTEGRATION ---
+
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    showMessage('Attempting to connect to wallet...', 'info');
+                    console.log("[DApp] Ethereum object detected. Requesting accounts...");
+
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    walletAddress = ethers.utils.getAddress(accounts[0]);
+
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+
+                    const network = await provider.getNetwork();
+                    console.log(`Connected to network with Chain ID: ${network.chainId}`);
+                    
+                    if (network.chainId !== DEFAULT_CHAIN_ID) {
+                        showMessage(`Connected to Chain ID: ${network.chainId}. Expected Ganache (${DEFAULT_CHAIN_ID}). Please switch network.`, 'error');
+                    } else {
+                        showMessage('Wallet connected successfully!', 'success');
+                    }
+
+                    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+                    document.getElementById('wallet-id-display').textContent = `Wallet ID: ${walletAddress}`;
+                    document.getElementById('connect-button').classList.add('hidden');
+                    
+                    window.ethereum.on('accountsChanged', (accounts) => {
+                        window.location.reload();
+                    });
+                    window.ethereum.on('chainChanged', (chainId) => {
+                        window.location.reload();
+                    });
+                    
+                    loadMarketplaceEvents();
+                    loadMyHostedEvents();
+                    loadMyTicketBalance();
+
+                } catch (error) {
+                    console.error("[DApp] Wallet connection failed:", error);
+                    let errorMessage = 'Connection failed. Check console for details.';
+                    
+                    if (error.code === 4001) {
+                         errorMessage = 'Connection rejected by user. Please try again.';
+                    }
+
+                    showMessage(errorMessage, 'error');
+                }
+            } else {
+                showMessage('MetaMask not detected. Please install it to use this DApp.', 'error');
+            }
+        }
+
+        async function handleCreateEvent(event) {
+            event.preventDefault();
+            if (!signer) {
+                return showMessage('Please connect your wallet first.', 'error');
+            }
+
+            try {
+                const title = document.getElementById('event-title').value;
+                const dateLocal = document.getElementById('event-date').value;
+                const priceEth = document.getElementById('event-price').value;
+                const totalTickets = document.getElementById('event-total-tickets').value;
+
+                const dateUnixSeconds = Math.floor(new Date(dateLocal).getTime() / 1000);
+                const priceInWei = ethers.utils.parseEther(priceEth);
+
+                showMessage('Creating event on the blockchain... (Confirm transaction in wallet)', 'info');
+
+                const tx = await contract.createEvent(
+                    title,
+                    dateUnixSeconds,
+                    priceInWei,
+                    totalTickets
+                );
+
+                await tx.wait();
+
+                showMessage(`Event "${title}" created successfully! TX Hash: ${tx.hash.substring(0, 10)}...`, 'success');
+                document.getElementById('create-event-form').reset();
+                loadMyHostedEvents();
+
+            } catch (error) {
+                console.error("Error creating event:", error);
+                const message = error.data?.message || error.message || "Transaction failed or rejected.";
+                showMessage(`Error creating event: ${message.substring(0, 100)}`, 'error');
+            }
+        }
+        
+        async function loadMyHostedEvents() {
+            const container = document.getElementById('my-hosted-events');
+            container.innerHTML = '<p class="text-gray-500 text-center p-4">Fetching hosted events...</p>';
+            if (!provider || !walletAddress) return container.innerHTML = '<p class="text-gray-500 text-center p-4">Wallet not connected.</p>';
+
+            try {
+                const eventCount = await contract._eventIdCounter();
+                let eventsHtml = '';
+                let hostedCount = 0;
+
+                for (let i = 1; i < eventCount.toNumber(); i++) {
+                    const details = await contract.getEventDetails(i);
+                    if (details.host.toLowerCase() === walletAddress.toLowerCase()) {
+                        hostedCount++;
+                        const date = new Date(details.date.toNumber() * 1000).toLocaleString();
+                        const priceEth = ethers.utils.formatEther(details.price);
+
+                        eventsHtml += `
+                            <div class="bg-gray-700 p-4 rounded-lg border-l-4 border-teal-500">
+                                <p class="text-lg font-semibold">${details.title} (ID: ${i})</p>
+                                <p class="text-sm text-gray-300">Date: ${date}</p>
+                                <p class="text-sm text-gray-300">Price: ${priceEth} ETH</p>
+                                <p class="text-sm text-gray-300">Status: ${details.sold}/${details.total} Tickets Sold</p>
+                            </div>
+                        `;
+                    }
+                }
+
+                container.innerHTML = hostedCount > 0 ? eventsHtml : '<p class="text-gray-500 text-center p-4">You have not hosted any events yet.</p>';
+
+            } catch (error) {
+                console.error("Error loading hosted events:", error);
+                container.innerHTML = '<p class="text-red-500 text-center p-4">Error loading hosted events. Check console for details.</p>';
+            }
+        }
+
+        async function loadMarketplaceEvents() {
+            const container = document.getElementById('active-events-list');
+            container.innerHTML = '<p class="text-gray-500 text-center p-4">Fetching events from the ledger...</p>';
+            if (!provider) return container.innerHTML = '<p class="text-gray-500 text-center p-4">Wallet not connected.</p>';
+
+            try {
+                const eventCount = await contract._eventIdCounter();
+                let eventsHtml = '';
+                let activeCount = 0;
+
+                for (let i = 1; i < eventCount.toNumber(); i++) {
+                    const details = await contract.events(i);
+                    
+                    if (details.active && details.ticketsSold.lt(details.totalTickets)) {
+                        activeCount++;
+                        const date = new Date(details.date.toNumber() * 1000).toLocaleString();
+                        const priceEth = ethers.utils.formatEther(details.priceInWei);
+                        const remaining = details.totalTickets.sub(details.ticketsSold).toString();
+                        
+                        eventsHtml += `
+                            <div class="bg-gray-700 p-4 rounded-lg flex justify-between items-center border-l-4 border-purple-500">
+                                <div>
+                                    <p class="text-lg font-semibold">${details.title} (ID: ${i})</p>
+                                    <p class="text-sm text-gray-300">Date: ${date} | Price: ${priceEth} ETH</p>
+                                    <p class="text-sm text-yellow-300">Remaining: ${remaining} of ${details.totalTickets} tickets</p>
+                                </div>
+                                <button onclick="handleBuyTicket(${i}, '${details.priceInWei.toString()}')" 
+                                        class="ml-4 bg-lime-500 hover:bg-lime-600 text-gray-900 font-bold py-2 px-4 rounded-lg transition duration-200">
+                                    Buy 1 Ticket
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+
+                container.innerHTML = activeCount > 0 ? eventsHtml : '<p class="text-gray-500 text-center p-4">No active events currently available.</p>';
+
+            } catch (error) {
+                console.error("Error loading marketplace events:", error);
+                container.innerHTML = '<p class="text-red-500 text-center p-4">Error loading marketplace. Check console for details.</p>';
+            }
+        }
+
+        async function handleBuyTicket(eventId, priceInWei) {
+            if (!signer) {
+                return showMessage('Please connect your wallet first.', 'error');
+            }
+
+            try {
+                showMessage(`Purchasing ticket for Event ID ${eventId}... (Confirm payment in wallet)`, 'info');
+
+                const tx = await contract.buyTicket(eventId, {
+                    value: priceInWei
+                });
+
+                await tx.wait();
+
+                showMessage(`Successfully bought a ticket for Event ID ${eventId}! TX Hash: ${tx.hash.substring(0, 10)}...`, 'success');
+                loadMarketplaceEvents();
+                loadMyTicketBalance();
+
+            } catch (error) {
+                console.error("Error buying ticket:", error);
+                const message = error.data?.message || error.message || "Transaction failed or rejected.";
+                showMessage(`Error buying ticket: ${message.substring(0, 100)}`, 'error');
+            }
+        }
+        
+        async function loadMyTicketBalance() {
+             const balanceDisplay = document.getElementById('ticket-balance-display');
+             if (!provider || !walletAddress) return balanceDisplay.textContent = 'Owned Tickets (Total NFTs): 0';
+
+             try {
+                const balance = await contract.balanceOf(walletAddress);
+                balanceDisplay.textContent = `Owned Tickets (Total NFTs): ${balance.toString()}`;
+
+             } catch (error) {
+                console.error("Error fetching ticket balance:", error);
+                balanceDisplay.textContent = 'Owned Tickets (Total NFTs): Error';
+             }
+        }
+
+        async function handleTicketTransfer() {
+            if (!signer) {
+                return showMessage('Please connect your wallet first.', 'error');
+            }
+
+            const tokenId = document.getElementById('transfer-token-id').value;
+            const recipient = document.getElementById('transfer-recipient-address').value;
+
+            if (!tokenId || !recipient) {
+                return showMessage('Please enter both the Ticket ID and Recipient Address.', 'error');
+            }
+
+            if (!ethers.utils.isAddress(recipient)) {
+                return showMessage('Invalid Recipient Address format.', 'error');
+            }
+            
+            if (recipient.toLowerCase() === walletAddress.toLowerCase()) {
+                return showMessage('Cannot transfer a ticket to yourself.', 'error');
+            }
+
+            try {
+                showMessage(`Initiating transfer of Ticket ID ${tokenId} to ${recipient.substring(0, 6)}...`, 'info');
+
+                const tx = await contract.transferTicket(
+                    walletAddress,
+                    recipient,
+                    tokenId
+                );
+
+                await tx.wait();
+
+                showMessage(`Ticket ID ${tokenId} successfully transferred! TX Hash: ${tx.hash.substring(0, 10)}...`, 'success');
+                loadMyTicketBalance();
+
+            } catch (error) {
+                console.error("Error transferring ticket:", error);
+                const message = error.data?.message || error.message || "Transaction failed or rejected.";
+                showMessage(`Error transferring ticket: ${message.substring(0, 100)}`, 'error');
+            }
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            document.getElementById('connect-button').addEventListener('click', connectWallet);
+            document.getElementById('create-event-form').addEventListener('submit', handleCreateEvent);
+            switchTab('host');
+        };
+        
+    </script>
+</body>
+</html>
