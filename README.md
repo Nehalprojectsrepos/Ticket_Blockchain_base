@@ -1,0 +1,104 @@
+📌 EventChainTickets — README
+🧠 Overview
+
+EventChainTickets is a simple decentralized event ticketing DApp built on Ethereum.
+It allows:
+
+✅ Event hosts to create events with ticket limits & prices
+
+💳 Users to purchase tickets (ERC721 NFTs)
+
+🔄 Transfer tickets to other users
+
+🌐 View owned tickets and related event info via a browser frontend
+
+🧰 Prerequisites
+
+Before you start, make sure you have:
+
+Remix IDE
+
+MetaMask
+ browser extension installed
+
+Ganache
+ running locally (Default RPC: http://127.0.0.1:7545)
+
+A local Ethereum account imported into MetaMask using a Ganache private key
+
+⚙️ Step 1: Start Ganache
+
+Launch Ganache GUI
+
+Start a new workspace (Quickstart is fine).
+
+Note the RPC Server URL (e.g., HTTP://127.0.0.1:7545).
+
+Copy one of the private keys from Ganache, and import it into MetaMask.
+
+🟡 Ensure MetaMask network is set to Custom RPC → Ganache with Chain ID 1337.
+
+🧱 Step 2: Deploy Contract on Remix
+
+Open Remix IDE
+.
+
+Create a new file named EventChainTickets.sol.
+
+Paste the entire Solidity contract into it.
+
+Go to the Solidity Compiler tab:
+
+Select 0.8.20
+
+Click Compile EventChainTickets.sol ✅
+
+Go to the Deploy & Run Transactions tab:
+
+Environment: Injected Provider - MetaMask or Ganache Provider
+
+Gas Limit: 10000000
+
+Deploy the contract
+
+Approve the MetaMask popup
+
+✅ Once deployed, copy the deployed contract address shown in Remix → “Deployed Contracts” panel.
+
+🌐 Step 3: Configure Frontend (HTML)
+
+Here’s a basic HTML frontend that connects to MetaMask and lets users interact with the deployed contract 👇
+Save this file as index.html in your project folder.
+📝 Step 4: Run the Frontend
+
+Open index.html in your browser.
+
+Click “Connect Wallet” → MetaMask popup will appear → approve.
+
+Use the forms to:
+
+Create a new event (future date, some price like 0.01 ETH)
+
+Copy its Event ID (starts from 1)
+
+Buy tickets using the “Buy Ticket” form
+
+Click “View My Tickets” to see your NFT tickets with event names 🎟
+
+🧪 Testing Tips
+
+If transactions fail due to gas → set Remix gas limit to 10000000.
+
+Ganache doesn’t charge real ETH, so you can test freely.
+
+If frontend doesn’t fetch data, make sure the ABI and address match the contract you deployed.
+
+🚀 That’s It!
+
+You now have a fully working local blockchain ticketing DApp:
+
+✅ Smart contract deployed via Remix on Ganache
+
+🌐 Frontend interacting via Web3.js and MetaMask
+
+🧠 Clean structure ready to extend
